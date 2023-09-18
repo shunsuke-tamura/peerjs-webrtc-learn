@@ -2,6 +2,41 @@ import { Peer, DataConnection } from "peerjs";
 import "./App.css";
 import { useEffect, useState } from "react";
 
+type XYZ = {
+  x: number;
+  y: number;
+  z: number;
+};
+
+/**
+type = "sensorInfo" | "sensorInit"
+{
+  "type": "sensorInit",
+  "data": {
+    "acc": {
+      "x": 0.1,
+      "y": 0.2,
+      "z": 0.3
+    },
+    "gyro": {
+      "x": 0.1,
+      "y": 0.2,
+      "z": 0.3
+    }
+  }
+}
+*/
+
+type sensorInfo = {
+  acc: XYZ;
+  gyro: XYZ;
+};
+
+type Message = {
+  type: "sensorInit" | "sensorInfo";
+  data: sensorInfo;
+};
+
 type Msg = {
   text: string;
 };
@@ -18,6 +53,11 @@ const GeneratePeerId = () => {
   return rand();
 };
 
+// radians to degrees
+const rad2deg = (rad: number) => {
+  return (rad * 180) / Math.PI;
+};
+
 function App() {
   const [peer, setPeer] = useState<Peer | null>(null);
   const [conn, setConn] = useState<PeerConnection | null>(null);
@@ -25,6 +65,11 @@ function App() {
   const [inputId, setInputId] = useState<string>("");
   const [inputMsg, setInputMsg] = useState<Msg>({ text: "" });
   const [recievedMessage, setRecievedMessage] = useState<Msg | null>(null);
+  const [sensorInfo, setSensorInfo] = useState<sensorInfo | null>(null);
+  const [initsensorInfo, setInitsensorInfo] = useState<sensorInfo>({
+    acc: { x: 0, y: 0, z: 0 },
+    gyro: { x: 0, y: 0, z: 0 },
+  });
 
   useEffect(() => {
     const id = GeneratePeerId();
@@ -34,15 +79,42 @@ function App() {
 
     peer.on("connection", (conn) => {
       conn.on("data", (data) => {
-        const recieved: Msg = JSON.parse(data as string);
+        // log data type
+        console.log(typeof data);
+        console.log(data);
+
+        // const recieved: Msg = data as Msg;
+        // console.log(recieved);
+        // console.log(recieved);
+        // setRecievedMessage(recieved);
+        const recieved: Message = data as Message;
         console.log(recieved);
-        setRecievedMessage(recieved);
+
+        if (recieved.type === "sensorInit") {
+          setInitsensorInfo(recieved.data);
+        } else if (recieved.type === "sensorInfo") {
+          setSensorInfo((prev) => {
+            if (!prev) return recieved.data;
+            else {
+              prev.gyro.x +=
+                recieved.data.gyro.x > 0.02 ? recieved.data.gyro.x : 0;
+              prev.gyro.y +=
+                recieved.data.gyro.y > 0.02 ? recieved.data.gyro.y : 0;
+              prev.gyro.z +=
+                recieved.data.gyro.z > 0.02 ? recieved.data.gyro.z : 0;
+              console.log(prev);
+              return prev;
+            }
+          });
+        }
       });
       conn.on("open", () => {
         const res: Msg = {
           text: `hello ${conn.peer}!  I am ${id}`,
         };
-        conn.send(JSON.stringify(res));
+        // Json to ArrayBuffer
+        const ab = new TextEncoder().encode(JSON.stringify(res)).buffer;
+        conn.send(ab);
       });
       setConn({ id: conn.peer, conn: conn });
     });
@@ -51,21 +123,28 @@ function App() {
   const connect = (toId: string) => {
     const conn = peer!.connect(toId);
     conn.on("data", (data) => {
-      const recieved: Msg = JSON.parse(data as string);
-      console.log(recieved);
+      // ArrayBuffer to Json
+      const json = new TextDecoder().decode(data as ArrayBuffer);
+      const recieved: Msg = JSON.parse(json as string);
       setRecievedMessage({ text: recieved.text });
     });
     conn.on("open", () => {
       const greet: Msg = {
         text: `hi! I am ${thisId}`,
       };
-      conn.send(JSON.stringify(greet));
+      // Json to ArrayBuffer
+      const ab = new TextEncoder().encode(JSON.stringify(greet)).buffer;
+      conn.send(ab);
     });
     setConn({ id: conn.peer, conn: conn });
   };
 
   const send = (msg: Msg) => {
-    conn!.conn.send(JSON.stringify(msg));
+    // Json to ArrayBuffer
+    const ab = new TextEncoder().encode(JSON.stringify(msg)).buffer;
+    console.log(ab);
+
+    conn!.conn.send(ab);
   };
 
   return (
@@ -103,6 +182,31 @@ function App() {
         </>
       )}
       {recievedMessage && <div>recieved message: {recievedMessage!.text}</div>}
+      {sensorInfo && (
+        <div
+          style={{
+            width: 5,
+            transform: `rotate(${
+              rad2deg(sensorInfo.gyro.z) - rad2deg(initsensorInfo.gyro.z)
+            }deg)`,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "red",
+              width: 5,
+              height: 80,
+            }}
+          ></div>
+          <div
+            style={{
+              backgroundColor: "blue",
+              width: 5,
+              height: 80,
+            }}
+          ></div>
+        </div>
+      )}
     </>
   );
 }
