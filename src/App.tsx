@@ -1,6 +1,7 @@
 import { Peer, DataConnection } from "peerjs";
 import "./App.css";
 import { useEffect, useState, useRef } from "react";
+import QRCode from "./QRCode";
 
 type XYZ = {
   x: number;
@@ -62,18 +63,18 @@ type Target = {
   score: number;
 };
 
-const GeneratePeerId = () => {
-  const rand = () => {
-    return Math.random().toString(36).substring(2);
-  };
-  return rand();
-};
+// const GeneratePeerId = () => {
+//   const rand = () => {
+//     return Math.random().toString(36).substring(2);
+//   };
+//   return rand();
+// };
 
 function App() {
   const [peer, setPeer] = useState<Peer | null>(null);
   const [conn, setConn] = useState<PeerConnection | null>(null);
   const [thisId, setThisId] = useState<string | null>(null);
-  const [inputId, setInputId] = useState<string>("");
+  // const [inputId, setInputId] = useState<string>("");
   const [inputMsg, setInputMsg] = useState<Msg>({ text: "" });
   const [recievedMessage, setRecievedMessage] = useState<Msg | null>(null);
   const [sensorPerInfo, setSensorPerInfo] = useState<SensorPerInfo | null>(
@@ -113,8 +114,9 @@ function App() {
   };
 
   useEffect(() => {
-    const id = GeneratePeerId();
+    // const id = GeneratePeerId();
     // const id = "zxrsnb2oxoe";
+    const id = self.crypto.randomUUID();
     setThisId(id);
     const peer = new Peer(id);
     setPeer(peer);
@@ -298,23 +300,23 @@ function App() {
     // ctx.setTransform(1, 0, 0, 1, 0, 0);
   }, [sensorPerInfo, users, targets]);
 
-  const connect = (toId: string) => {
-    const conn = peer!.connect(toId);
-    conn.on("data", (data) => {
-      // ArrayBuffer to Json
-      const json = new TextDecoder().decode(data as ArrayBuffer);
-      const recieved: Msg = JSON.parse(json as string);
-      setRecievedMessage({ text: recieved.text });
-    });
-    conn.on("open", () => {
-      const greet: Msg = {
-        text: `hi! I am ${thisId}`,
-      };
-      // Json to ArrayBuffer
-      send(greet, conn);
-    });
-    setConn({ id: conn.peer, conn: conn });
-  };
+  // const connect = (toId: string) => {
+  //   const conn = peer!.connect(toId);
+  //   conn.on("data", (data) => {
+  //     // ArrayBuffer to Json
+  //     const json = new TextDecoder().decode(data as ArrayBuffer);
+  //     const recieved: Msg = JSON.parse(json as string);
+  //     setRecievedMessage({ text: recieved.text });
+  //   });
+  //   conn.on("open", () => {
+  //     const greet: Msg = {
+  //       text: `hi! I am ${thisId}`,
+  //     };
+  //     // Json to ArrayBuffer
+  //     send(greet, conn);
+  //   });
+  //   setConn({ id: conn.peer, conn: conn });
+  // };
 
   const send = (msg: unknown, conn: DataConnection) => {
     // Json to ArrayBuffer
@@ -326,7 +328,7 @@ function App() {
     <>
       <div>I am {thisId}</div>
       <br />
-      <div
+      {/* <div
         style={{
           display: "flex",
         }}
@@ -337,8 +339,13 @@ function App() {
           onChange={(e) => setInputId(e.target.value)}
         />
         <button onClick={() => connect(inputId)}>connect</button>
-      </div>
+      </div> */}
       <br />
+      {thisId && (
+        <div style={{ backgroundColor: "white" }}>
+          <QRCode id={thisId}></QRCode>
+        </div>
+      )}
       {conn && (
         <>
           <div>connected to {conn.id}</div>
