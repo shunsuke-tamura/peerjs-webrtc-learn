@@ -32,6 +32,13 @@ type PeerConnection = {
   conn: DataConnection;
 };
 
+type User = {
+  id: string;
+  peerId: string;
+  name: string;
+  pointer: XY;
+};
+
 type UserSetting = {
   name: string;
 };
@@ -42,7 +49,7 @@ type UserSettingRes = {
 };
 
 type Shoot = {
-  action: "shoot";
+  sensorPerInfo: SensorPerInfo;
 };
 
 type ShootRes = {
@@ -75,6 +82,7 @@ function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [targets, setTargets] = useState<Target[] | null>(null);
   const TargetNum = 3;
+  const [users, setUsers] = useState<User[]>([]);
 
   const generateTarget = (width: number, height: number): Target => {
     const size = Math.floor(Math.random() * 40) + 20;
@@ -86,10 +94,24 @@ function App() {
     return { size, position, score };
   };
 
-  useEffect(() => {
-    let ignore = false;
-    if (ignore) return;
+  const targetHit = (target: Target, pointer: XY): Target | null => {
+    const x = pointer.x - target.position.x;
+    const y = pointer.y - target.position.y;
+    const distance = Math.sqrt(x * x + y * y);
+    if (distance < target.size / 2) {
+      return target;
+    }
+    return null;
+  };
 
+  const sensorPerInfoToPointer = (sensorPerInfo: SensorPerInfo): XY => {
+    return {
+      x: 600 * sensorPerInfo.gyro.z + 600 / 2,
+      y: 600 * sensorPerInfo.gyro.x + 600 / 2,
+    };
+  };
+
+  useEffect(() => {
     const id = GeneratePeerId();
     // const id = "u8ga0dgnz8e";
     setThisId(id);
@@ -99,13 +121,66 @@ function App() {
     peer.on("connection", (conn) => {
       conn.on("data", (data) => {
         const recieved: Message = data as Message;
-        if (recieved.data.gyro.z > 0.02) console.log(recieved);
-
+        // Message.type handling
         if (recieved.type === "sensorInit") {
           // setInitSensorInfo(recieved.data);
           console.log(recieved.data);
         } else if (recieved.type === "sensorInfo") {
-          setSensorPerInfo(recieved.data);
+          setUsers((prev) => {
+            let u: User | undefined;
+            users.forEach((user, index) => {
+              if (user.peerId === conn.peer) {
+                u = user;
+                users.splice(index, 1);
+              }
+            });
+            const user = u
+              ? {
+                  id: u.id,
+                  peerId: u.peerId,
+                  name: u.name,
+                  pointer: sensorPerInfoToPointer(
+                    recieved.data as SensorPerInfo
+                  ),
+                }
+              : u;
+            const newUsers = user ? [...prev, user] : prev;
+            // sort by id
+            newUsers.sort((a, b) => {
+              if (a.id < b.id) return -1;
+              if (a.id > b.id) return 1;
+              return 0;
+            });
+            return newUsers;
+          });
+          setSensorPerInfo(recieved.data as SensorPerInfo);
+        } else if (recieved.type === "userSetting") {
+          setUsers((prev) => {
+            const user: User = {
+              id: `${prev.length + 1}P`,
+              peerId: conn.peer,
+              name: (recieved.data as UserSetting).name,
+              pointer: { x: 0, y: 0 },
+            };
+            send({ id: user.id, name: user.name } as UserSettingRes, conn);
+            return [...prev, user];
+          });
+        } else if (recieved.type === "shoot") {
+          const shoot: Shoot = recieved.data as Shoot;
+          if (!targets) return;
+
+          let hit: Target | null = null;
+          for (const target of targets) {
+            hit = targetHit(
+              target,
+              sensorPerInfoToPointer(shoot.sensorPerInfo)
+            );
+            if (hit) break;
+          }
+          const res: ShootRes = {
+            score: hit ? hit.score : null,
+          };
+          send(res, conn);
         }
       });
       conn.on("open", () => {
@@ -128,28 +203,17 @@ function App() {
 
     return () => {
       peer.destroy();
-      ignore = true;
     };
   }, []);
 
-  const drowPointer = (
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number
-  ) => {
+  const drowPointer = (ctx: CanvasRenderingContext2D, user: User) => {
     ctx.beginPath();
-    ctx.arc(
-      width - width * sensorPerInfo!.gyro.z,
-      height - height * sensorPerInfo!.gyro.x,
-      10,
-      0,
-      Math.PI * 2,
-      true
-    );
+    ctx.arc(user.pointer.x, user.pointer.y, 10, 0, Math.PI * 2, true);
     ctx.fillStyle = "lightskyblue";
     ctx.fill();
     ctx.strokeStyle = "deepskyblue";
     ctx.lineWidth = 5;
+    ctx.fillText(user.id, user.pointer.x, user.pointer.y - 5);
     ctx.stroke();
   };
 
@@ -183,8 +247,9 @@ function App() {
 
     if (!targets) return;
     drowTargets(ctx);
-    if (!sensorPerInfo) return;
-    drowPointer(ctx, width, height);
+    users.forEach((user) => {
+      drowPointer(ctx, user);
+    });
     // (0,0) is center
     ctx.translate(width / 2, height / 2);
   }, [sensorPerInfo, targets]);
@@ -208,10 +273,10 @@ function App() {
     setConn({ id: conn.peer, conn: conn });
   };
 
-  const send = (msg: Msg) => {
+  const send = (msg: unknown, conn: DataConnection) => {
     // Json to ArrayBuffer
     const ab = new TextEncoder().encode(JSON.stringify(msg)).buffer;
-    conn!.conn.send(ab);
+    conn.send(ab);
   };
 
   return (
@@ -244,7 +309,7 @@ function App() {
               value={inputMsg.text}
               onChange={(e) => setInputMsg({ text: e.target.value })}
             />
-            <button onClick={() => send(inputMsg)}>send</button>
+            {/* <button onClick={() => send(inputMsg)}>send</button> */}
           </div>
         </>
       )}
