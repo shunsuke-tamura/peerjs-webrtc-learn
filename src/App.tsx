@@ -215,8 +215,10 @@ function App() {
     ctx.fill();
     ctx.strokeStyle = "deepskyblue";
     ctx.lineWidth = 5;
-    ctx.fillText(user.id, user.pointer.x, user.pointer.y - 5);
     ctx.stroke();
+    ctx.font = "bold 14px Arial";
+    ctx.fillStyle = "gray";
+    ctx.fillText(user.id, user.pointer.x, user.pointer.y - 5);
   };
 
   const drawTargets = (ctx: CanvasRenderingContext2D) => {
