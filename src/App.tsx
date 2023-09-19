@@ -106,14 +106,14 @@ function App() {
 
   const sensorPerInfoToPointer = (sensorPerInfo: SensorPerInfo): XY => {
     return {
-      x: 600 * sensorPerInfo.gyro.z + 600 / 2,
-      y: 600 * sensorPerInfo.gyro.x + 600 / 2,
+      x: 600 - (600 * sensorPerInfo.gyro.z + 600 / 2),
+      y: 600 - (600 * sensorPerInfo.gyro.x + 600 / 2),
     };
   };
 
   useEffect(() => {
     const id = GeneratePeerId();
-    // const id = "u8ga0dgnz8e";
+    // const id = "zxrsnb2oxoe";
     setThisId(id);
     const peer = new Peer(id);
     setPeer(peer);
@@ -121,19 +121,21 @@ function App() {
     peer.on("connection", (conn) => {
       conn.on("data", (data) => {
         const recieved: Message = data as Message;
+
         // Message.type handling
         if (recieved.type === "sensorInit") {
           // setInitSensorInfo(recieved.data);
-          console.log(recieved.data);
+          // console.log(recieved.data);
         } else if (recieved.type === "sensorInfo") {
           setUsers((prev) => {
             let u: User | undefined;
-            users.forEach((user, index) => {
+            prev.forEach((user, index) => {
               if (user.peerId === conn.peer) {
                 u = user;
-                users.splice(index, 1);
+                prev.splice(index, 1);
               }
             });
+
             const user = u
               ? {
                   id: u.id,
@@ -187,9 +189,7 @@ function App() {
         const res: Msg = {
           text: `hello ${conn.peer}!  I am ${id}`,
         };
-        // Json to ArrayBuffer
-        const ab = new TextEncoder().encode(JSON.stringify(res)).buffer;
-        conn.send(ab);
+        send(res, conn);
       });
       setConn({ id: conn.peer, conn: conn });
     });
@@ -202,11 +202,13 @@ function App() {
     }
 
     return () => {
-      peer.destroy();
+      // peer.destroy();
     };
   }, []);
 
-  const drowPointer = (ctx: CanvasRenderingContext2D, user: User) => {
+  const drawPointer = (ctx: CanvasRenderingContext2D, user: User) => {
+    console.log(user);
+
     ctx.beginPath();
     ctx.arc(user.pointer.x, user.pointer.y, 10, 0, Math.PI * 2, true);
     ctx.fillStyle = "lightskyblue";
@@ -217,8 +219,8 @@ function App() {
     ctx.stroke();
   };
 
-  const drowTargets = (ctx: CanvasRenderingContext2D) => {
-    console.log(targets);
+  const drawTargets = (ctx: CanvasRenderingContext2D) => {
+    // console.log(targets);
 
     targets!.forEach((target) => {
       ctx.beginPath();
@@ -239,20 +241,23 @@ function App() {
   };
 
   useEffect(() => {
+    console.log("draw");
+
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     const width = canvasRef.current!.width;
     const height = canvasRef.current!.height;
     ctx.clearRect(0, 0, width, height);
+    ctx.fill();
 
     if (!targets) return;
-    drowTargets(ctx);
+    drawTargets(ctx);
+    // ctx.translate(width / 2, height / 2);
     users.forEach((user) => {
-      drowPointer(ctx, user);
+      drawPointer(ctx, user);
     });
-    // (0,0) is center
-    ctx.translate(width / 2, height / 2);
-  }, [sensorPerInfo, targets]);
+    // ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }, [sensorPerInfo, users, targets]);
 
   const connect = (toId: string) => {
     const conn = peer!.connect(toId);
@@ -267,8 +272,7 @@ function App() {
         text: `hi! I am ${thisId}`,
       };
       // Json to ArrayBuffer
-      const ab = new TextEncoder().encode(JSON.stringify(greet)).buffer;
-      conn.send(ab);
+      send(greet, conn);
     });
     setConn({ id: conn.peer, conn: conn });
   };
@@ -314,7 +318,7 @@ function App() {
         </>
       )}
       {recievedMessage && <div>recieved message: {recievedMessage!.text}</div>}
-      {sensorPerInfo && (
+      {/* {sensorPerInfo && (
         <div>
           <div
             style={{
@@ -339,7 +343,7 @@ function App() {
           </div>
           <canvas width={600} height={600} ref={canvasRef}></canvas>
         </div>
-      )}
+      )} */}
       <canvas width={600} height={600} ref={canvasRef}></canvas>
     </>
   );
