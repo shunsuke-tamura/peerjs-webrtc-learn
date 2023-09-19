@@ -8,29 +8,10 @@ type XYZ = {
   z: number;
 };
 
-/**
-type = "sensorInfo" | "sensorInit"
-{
-  "type": "sensorInit",
-  "data": {
-    "acc": {
-      "x": 0.1,
-      "y": 0.2,
-      "z": 0.3
-    },
-    "gyro": {
-      "x": 0.1,
-      "y": 0.2,
-      "z": 0.3
-    }
-  }
-}
-*/
-
-// type PointerPosition = {
-//   x: number;
-//   y: number;
-// };
+type XY = {
+  x: number;
+  y: number;
+};
 
 type SensorPerInfo = {
   acc: XYZ;
@@ -38,8 +19,8 @@ type SensorPerInfo = {
 };
 
 type Message = {
-  type: "sensorInit" | "sensorInfo";
-  data: SensorPerInfo;
+  type: "sensorInit" | "sensorInfo" | "shoot" | "userSetting";
+  data: SensorPerInfo | Shoot | UserSetting;
 };
 
 type Msg = {
@@ -51,17 +32,35 @@ type PeerConnection = {
   conn: DataConnection;
 };
 
-// const GeneratePeerId = () => {
-//   const rand = () => {
-//     return Math.random().toString(36).substring(2);
-//   };
-//   return rand();
-// };
+type UserSetting = {
+  name: string;
+};
 
-// radians to degrees
-// const rad2deg = (rad: number) => {
-//   return (rad * 180) / Math.PI;
-// };
+type UserSettingRes = {
+  id: string;
+  name: string;
+};
+
+type Shoot = {
+  action: "shoot";
+};
+
+type ShootRes = {
+  score: number | null;
+};
+
+type Target = {
+  size: number;
+  position: XY;
+  score: number;
+};
+
+const GeneratePeerId = () => {
+  const rand = () => {
+    return Math.random().toString(36).substring(2);
+  };
+  return rand();
+};
 
 function App() {
   const [peer, setPeer] = useState<Peer | null>(null);
@@ -73,25 +72,32 @@ function App() {
   const [sensorPerInfo, setSensorPerInfo] = useState<SensorPerInfo | null>(
     null
   );
-  // const [initSensorInfo, setInitSensorInfo] = useState<SensorPerInfo>({
-  //   acc: { x: 0, y: 0, z: 0 },
-  //   gyro: { x: 0, y: 0, z: 0 },
-  // });
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [targets, setTargets] = useState<Target[] | null>(null);
+  const TargetNum = 3;
+
+  const generateTarget = (width: number, height: number): Target => {
+    const size = Math.floor(Math.random() * 40) + 20;
+    const position = {
+      x: Math.random() * (width - size),
+      y: Math.random() * (height - size),
+    };
+    const score = Math.floor(Math.random() * 10);
+    return { size, position, score };
+  };
 
   useEffect(() => {
-    // const id = GeneratePeerId();
-    const id = "5q9dw3t2au6";
+    let ignore = false;
+    if (ignore) return;
+
+    const id = GeneratePeerId();
+    // const id = "u8ga0dgnz8e";
     setThisId(id);
-    const peer = new Peer(id);
+    const peer = new Peer();
     setPeer(peer);
 
     peer.on("connection", (conn) => {
       conn.on("data", (data) => {
-        // const recieved: Msg = data as Msg;
-        // console.log(recieved);
-        // console.log(recieved);
-        // setRecievedMessage(recieved);
         const recieved: Message = data as Message;
         if (recieved.data.gyro.z > 0.02) console.log(recieved);
 
@@ -112,20 +118,29 @@ function App() {
       });
       setConn({ id: conn.peer, conn: conn });
     });
+
+    for (let i = 0; i < TargetNum; i++) {
+      setTargets((prev) => {
+        if (prev === null) return [generateTarget(600, 600)];
+        return [...prev, generateTarget(600, 600)];
+      });
+    }
+
+    return () => {
+      peer.destroy();
+      ignore = true;
+    };
   }, []);
 
-  useEffect(() => {
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    const width = canvasRef.current!.width;
-    const height = canvasRef.current!.height;
-    ctx.clearRect(0, 0, width, height);
-    console.log(sensorPerInfo!.gyro.z);
-    console.log(sensorPerInfo!.gyro.x);
+  const drowPointer = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number
+  ) => {
     ctx.beginPath();
     ctx.arc(
-      width - (width * sensorPerInfo!.gyro.z + width / 2),
-      height - (height * sensorPerInfo!.gyro.x + height / 2),
+      width - width * sensorPerInfo!.gyro.z,
+      height - height * sensorPerInfo!.gyro.x,
       10,
       0,
       Math.PI * 2,
@@ -136,7 +151,43 @@ function App() {
     ctx.strokeStyle = "deepskyblue";
     ctx.lineWidth = 5;
     ctx.stroke();
-  }, [sensorPerInfo]);
+  };
+
+  const drowTargets = (ctx: CanvasRenderingContext2D) => {
+    console.log(targets);
+
+    targets!.forEach((target) => {
+      ctx.beginPath();
+      ctx.arc(
+        target.position.x + target.size / 2,
+        target.position.y + target.size / 2,
+        target.size / 2,
+        0,
+        Math.PI * 2,
+        true
+      );
+      ctx.fillStyle = "lightpink";
+      ctx.fill();
+      ctx.strokeStyle = "deeppink";
+      ctx.lineWidth = 5;
+      ctx.stroke();
+    });
+  };
+
+  useEffect(() => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    const width = canvasRef.current!.width;
+    const height = canvasRef.current!.height;
+    ctx.clearRect(0, 0, width, height);
+
+    if (!targets) return;
+    drowTargets(ctx);
+    if (!sensorPerInfo) return;
+    drowPointer(ctx, width, height);
+    // (0,0) is center
+    ctx.translate(width / 2, height / 2);
+  }, [sensorPerInfo, targets]);
 
   const connect = (toId: string) => {
     const conn = peer!.connect(toId);
@@ -224,6 +275,7 @@ function App() {
           <canvas width={600} height={600} ref={canvasRef}></canvas>
         </div>
       )}
+      <canvas width={600} height={600} ref={canvasRef}></canvas>
     </>
   );
 }
