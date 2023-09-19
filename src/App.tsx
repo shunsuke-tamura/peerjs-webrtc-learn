@@ -276,7 +276,7 @@ function App() {
   const send = (msg: unknown, conn: DataConnection) => {
     // Json to ArrayBuffer
     const ab = new TextEncoder().encode(JSON.stringify(msg)).buffer;
-    conn.send(ab);
+    conn.send(new Uint8Array(ab));
   };
 
   return (
