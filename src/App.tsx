@@ -19,8 +19,8 @@ type SensorPerInfo = {
 };
 
 type Message = {
-  type: "sensorInit" | "sensorInfo" | "shoot" | "userSetting";
-  data: SensorPerInfo | Shoot | UserSetting;
+  type: "sensorInit" | "sensorInfo" | "shoot" | "shootRes" | "userSetting";
+  data: SensorPerInfo | Shoot | UserSetting | ShootRes;
 };
 
 type Msg = {
@@ -83,6 +83,7 @@ function App() {
   const [targets, setTargets] = useState<Target[] | null>(null);
   const TargetNum = 3;
   const [users, setUsers] = useState<User[]>([]);
+  const [broken, setBroken] = useState<Target | null>(null);
 
   const generateTarget = (width: number, height: number): Target => {
     const size = Math.floor(Math.random() * 40) + 20;
@@ -168,21 +169,44 @@ function App() {
             return [...prev, user];
           });
         } else if (recieved.type === "shoot") {
-          const shoot: Shoot = recieved.data as Shoot;
-          if (!targets) return;
+          console.log("shoot");
 
+          const shoot: Shoot = recieved.data as Shoot;
           let hit: Target | null = null;
-          for (const target of targets) {
-            hit = targetHit(
-              target,
-              sensorPerInfoToPointer(shoot.sensorPerInfo)
-            );
-            if (hit) break;
-          }
-          const res: ShootRes = {
-            score: hit ? hit.score : null,
-          };
-          send(res, conn);
+          setTargets((prev) => {
+            console.log(prev);
+            if (!prev) return null;
+
+            for (let i = 0; i < prev.length; i++) {
+              hit = targetHit(
+                prev[i],
+                sensorPerInfoToPointer(shoot.sensorPerInfo)
+              );
+              if (hit) {
+                prev!.splice(i, 1);
+                break;
+              }
+            }
+            console.log(sensorPerInfoToPointer(shoot.sensorPerInfo));
+
+            const res: Message = {
+              type: "shootRes",
+              data: {
+                score: hit ? hit.score : null,
+              } as ShootRes,
+            };
+            setBroken(hit);
+            setTimeout(() => {
+              setBroken(null);
+              setTargets((prev) => {
+                if (prev === null) return [generateTarget(600, 600)];
+                return [...prev, generateTarget(600, 600)];
+              });
+            }, 3000);
+            send(res, conn);
+
+            return prev;
+          });
         }
       });
       conn.on("open", () => {
@@ -207,7 +231,7 @@ function App() {
   }, []);
 
   const drawPointer = (ctx: CanvasRenderingContext2D, user: User) => {
-    console.log(user);
+    // console.log(user);
 
     ctx.beginPath();
     ctx.arc(user.pointer.x, user.pointer.y, 10, 0, Math.PI * 2, true);
@@ -227,8 +251,8 @@ function App() {
     targets!.forEach((target) => {
       ctx.beginPath();
       ctx.arc(
-        target.position.x + target.size / 2,
-        target.position.y + target.size / 2,
+        target.position.x,
+        target.position.y,
         target.size / 2,
         0,
         Math.PI * 2,
@@ -240,6 +264,19 @@ function App() {
       ctx.lineWidth = 5;
       ctx.stroke();
     });
+    if (broken) {
+      ctx.beginPath();
+      ctx.arc(broken.position.x, broken.position.y, 18, 0, Math.PI * 2, true);
+      ctx.fillStyle = `rgba(200,200,200,0.8)`;
+      ctx.fill();
+      ctx.font = "bold 18px Arial";
+      ctx.fillStyle = "black";
+      ctx.fillText(
+        `+${broken.score}`,
+        broken.position.x - 9,
+        broken.position.y + 7
+      );
+    }
   };
 
   useEffect(() => {
