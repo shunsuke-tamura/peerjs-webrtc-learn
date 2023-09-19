@@ -200,10 +200,12 @@ function App() {
             setBroken(hit);
             setTimeout(() => {
               setBroken(null);
-              setTargets((prev) => {
-                if (prev === null) return [generateTarget(600, 600)];
-                return [...prev, generateTarget(600, 600)];
-              });
+              if (hit) {
+                setTargets((prev) => {
+                  if (prev === null) return [generateTarget(600, 600)];
+                  return [...prev, generateTarget(600, 600)];
+                });
+              }
             }, 3000);
             send(res, conn);
 
