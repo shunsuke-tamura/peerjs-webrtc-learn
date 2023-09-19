@@ -115,7 +115,7 @@ function App() {
     const id = GeneratePeerId();
     // const id = "u8ga0dgnz8e";
     setThisId(id);
-    const peer = new Peer();
+    const peer = new Peer(id);
     setPeer(peer);
 
     peer.on("connection", (conn) => {
