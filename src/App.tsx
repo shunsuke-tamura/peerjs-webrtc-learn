@@ -34,7 +34,7 @@ type PeerConnection = {
 };
 
 type User = {
-  id: string;
+  id: number;
   peerId: string;
   name: string;
   pointer: XY;
@@ -45,7 +45,7 @@ type UserSetting = {
 };
 
 type UserSettingRes = {
-  id: string;
+  id: number;
   name: string;
 };
 
@@ -162,7 +162,7 @@ function App() {
         } else if (recieved.type === "userSetting") {
           setUsers((prev) => {
             const user: User = {
-              id: `${prev.length + 1}P`,
+              id: prev.length + 1,
               peerId: conn.peer,
               name: (recieved.data as UserSetting).name,
               pointer: { x: 0, y: 0 },
@@ -239,14 +239,14 @@ function App() {
 
     ctx.beginPath();
     ctx.arc(user.pointer.x, user.pointer.y, 10, 0, Math.PI * 2, true);
-    ctx.fillStyle = user.id === "1P" ? "lightskyblue" : "lightgreen";
+    ctx.fillStyle = user.id === 1 ? "lightskyblue" : "lightgreen";
     ctx.fill();
-    ctx.strokeStyle = user.id === "1P" ? "dodgerblue" : "limegreen";
+    ctx.strokeStyle = user.id === 1 ? "dodgerblue" : "limegreen";
     ctx.lineWidth = 5;
     ctx.stroke();
     ctx.font = "bold 14px Arial";
     ctx.fillStyle = "gray";
-    ctx.fillText(user.id, user.pointer.x, user.pointer.y - 5);
+    ctx.fillText(user.id.toString(), user.pointer.x, user.pointer.y - 5);
   };
 
   const drawTargets = (ctx: CanvasRenderingContext2D) => {
