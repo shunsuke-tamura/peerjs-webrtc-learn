@@ -239,9 +239,9 @@ function App() {
 
     ctx.beginPath();
     ctx.arc(user.pointer.x, user.pointer.y, 10, 0, Math.PI * 2, true);
-    ctx.fillStyle = "lightskyblue";
+    ctx.fillStyle = user.id === "1P" ? "lightskyblue" : "lightgreen";
     ctx.fill();
-    ctx.strokeStyle = "deepskyblue";
+    ctx.strokeStyle = user.id === "1P" ? "dodgerblue" : "limegreen";
     ctx.lineWidth = 5;
     ctx.stroke();
     ctx.font = "bold 14px Arial";
