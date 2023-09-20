@@ -2,6 +2,7 @@ import { Peer, DataConnection } from "peerjs";
 import "./App.css";
 import { useEffect, useState, useRef } from "react";
 import QRCode from "./QRCode";
+import { get } from "http";
 
 type XYZ = {
   x: number;
@@ -20,7 +21,13 @@ type SensorPerInfo = {
 };
 
 type Message = {
-  type: "sensorInit" | "sensorInfo" | "shoot" | "shootRes" | "userSetting";
+  type:
+    | "sensorInit"
+    | "sensorInfo"
+    | "shoot"
+    | "shootRes"
+    | "userSetting"
+    | "userSettingRes";
   data: SensorPerInfo | Shoot | UserSetting | ShootRes;
 };
 
@@ -47,6 +54,7 @@ type UserSetting = {
 type UserSettingRes = {
   id: number;
   name: string;
+  colorCode: string;
 };
 
 type Shoot = {
@@ -63,6 +71,38 @@ type Target = {
   score: number;
 };
 
+// getColorCodeFromId
+const getColorCodeFromId = (id: number): string => {
+  const index = id - 1;
+  const colors = ["FF0000", "0000FF", "008000", "FFFF00", "808080"];
+  return colors[index % colors.length];
+};
+
+// getFillColorFromId
+const getFillColorFromId = (id: number): string => {
+  const index = id - 1;
+  const colors = [
+    "rgba(255,0,0,0.5)",
+    "rgba(0,0,255,0.5)",
+    "rgba(0,128,0,0.5)",
+    "rgba(255,255,0,0.5)",
+    "rgba(128,128,128,0.5)",
+  ];
+  return colors[index % colors.length];
+};
+
+// getStrokeColorFromId
+const getStrokeColorFromId = (id: number): string => {
+  const index = id - 1;
+  const colors = [
+    "rgba(255,0,0,0.8)",
+    "rgba(0,0,255,0.8)",
+    "rgba(0,128,0,0.8)",
+    "rgba(255,255,0,0.8)",
+    "rgba(128,128,128,0.8)",
+  ];
+  return colors[index % colors.length];
+};
 // const GeneratePeerId = () => {
 //   const rand = () => {
 //     return Math.random().toString(36).substring(2);
@@ -167,7 +207,15 @@ function App() {
               name: (recieved.data as UserSetting).name,
               pointer: { x: 0, y: 0 },
             };
-            send({ id: user.id, name: user.name } as UserSettingRes, conn);
+            const res: Message = {
+              type: "userSettingRes",
+              data: {
+                id: user.id,
+                name: user.name,
+                colorCode: getColorCodeFromId(user.id),
+              } as UserSettingRes,
+            };
+            send(res, conn);
             return [...prev, user];
           });
         } else if (recieved.type === "shoot") {
@@ -239,9 +287,9 @@ function App() {
 
     ctx.beginPath();
     ctx.arc(user.pointer.x, user.pointer.y, 10, 0, Math.PI * 2, true);
-    ctx.fillStyle = user.id === 1 ? "lightskyblue" : "lightgreen";
+    ctx.fillStyle = getFillColorFromId(user.id);
     ctx.fill();
-    ctx.strokeStyle = user.id === 1 ? "dodgerblue" : "limegreen";
+    ctx.strokeStyle = getStrokeColorFromId(user.id);
     ctx.lineWidth = 5;
     ctx.stroke();
     ctx.font = "bold 14px Arial";
